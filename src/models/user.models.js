@@ -51,10 +51,11 @@ const userSchema = new mongoose.Schema(
 
 // pre is a middleware means before storing data into the DB ,
 // what to do
-userSchema.pre("save", function (next) {
+userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
-  this.password = bcrypt.hash(this.password, 8);
+  // because bcrypts takes time to hash the password 
+  this.password = await bcrypt.hash(this.password, 8);
   next();
 });
 
