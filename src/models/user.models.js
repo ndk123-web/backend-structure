@@ -1,7 +1,8 @@
-import mongoose, { ModifiedPathsSnapshot } from "mongoose";
+// import mongoose, { ModifiedPathsSnapshot } from "mongoose";
 import { Video } from "./video.models.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
@@ -51,6 +52,7 @@ const userSchema = new mongoose.Schema(
 
 // pre is a middleware means before storing data into the DB ,
 // what to do
+// this is pointing to the current document that is being saved
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
