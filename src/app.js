@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json({ limit: "20kb" }));   // accept json and limit size so it won't crash
 app.use(express.urlencoded({ limit: "20kb" })); // accept urlencoded and limit size , 
 app.use(express.static("public"));              // public folder where we store static files
-app.use(cookieParser());                        // we can set or get cookies 
+app.use(cookieParser());                        // we can set or get cookies can access req,cookie or res.cookie
 
 // routes 
 import { userRouter } from "./routes/user.routes.js";

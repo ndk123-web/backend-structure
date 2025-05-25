@@ -4,6 +4,33 @@ import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { access } from "fs";
+
+const generateAccessTokenRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+
+    // save the user with refresh token
+    // validateBeforeSave: false means that it will not run the validation before saving the user
+    // like we are not running the middleware for hashing the password again
+    await user.save({
+      validateBeforeSave: false,
+    });
+
+    return { accessToken, refreshToken };
+  } catch (err) {
+    throw new ApiError(500, "Error in generating tokens");
+  }
+};
 
 const registerUser = asyncHandler(async (req, res) => {
   // 1. get the data from request body
@@ -60,7 +87,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     // database entry creation
-    // calls automatically the pre middleware
+    // calls automatically the pre middleware to hash the password 
     const user = await User.create({
       fullname,
       username: username.toLowerCase(),
@@ -79,14 +106,12 @@ const registerUser = asyncHandler(async (req, res) => {
       throw new ApiError(500, "Something went wrong while creating user");
     }
 
-    // if all right then send response 
+    // if all right then send response
     res
       .status(201)
       .json(new ApiResponse(201, createdUser, "User registered Successfully"));
-  } 
-  
-  // if any error occurs then catch it and it's our error
-  catch (error) {
+  } catch (error) {
+    // if any error occurs then catch it and it's our error
     res.status(500).json(
       new ApiError({
         statusCode: 500,
@@ -96,4 +121,105 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+  // get the data from request body
+  // validate data - not empty , valid email
+  // find user in database using email
+  // if user not found then return error
+  // check if password is correct
+  // if password is correct then create access token and refresh token
+  // send cookie
+  // send response to client
+
+  const { email, password, username } = req.body;
+
+  if (!email || !password) {
+    throw new ApiError(400, "Email and password are required");
+  }
+
+  const user = await User.findOne({
+    $or: [{ email }, { username }],
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User Not Found");
+  }
+
+  console.log("Logging in: ", { email, username , password });
+
+  const isPasswordValid = await user.isPasswordCorrect(password);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid Password");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessTokenRefreshToken(
+    user._id,
+  );
+
+  // remove password and refreshToken from user object before sending response
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken",
+  );
+
+  // it means that only server can modify the cookie
+  // httpOnly : true means that the cookie cannot be accessed by JavaScript in the browser
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  // send response
+  // we are sending cookies to the client as well as response where data is present
+  res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        },
+        "User Logged In Successfully",
+      ),
+    );
+});
+
+const logOutUser = asyncHandler( async (req , res) => {
+
+  // refresh token set to null 
+  // if middleware successfuly verified then we can access req.user 
+
+  const userId = req.user._id;
+  
+  const user = await User.findById(userId);
+
+  if (!user){
+    throw new ApiError(404, "User not found");
+  }
+
+  user.refreshToken = "";
+
+  await user.save({
+    validateBeforeSave: false, // we dont want to run the pre middleware for hashing the password again 
+  })
+
+  // clear the cookies 
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  }
+
+  res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User Logged Out Successfully"));
+
+} )
+
+export { registerUser, logOutUser , loginUser };
