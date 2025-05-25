@@ -5,7 +5,10 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { access } from "fs";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
 
+// use for generating access token
 const generateAccessTokenRefreshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -32,6 +35,7 @@ const generateAccessTokenRefreshToken = async (userId) => {
   }
 };
 
+// register user
 const registerUser = asyncHandler(async (req, res) => {
   // 1. get the data from request body
   // 2. validate the data - not empty , valid email
@@ -87,7 +91,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     // database entry creation
-    // calls automatically the pre middleware to hash the password 
+    // calls automatically the pre middleware to hash the password
     const user = await User.create({
       fullname,
       username: username.toLowerCase(),
@@ -121,6 +125,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 });
 
+// login user
 const loginUser = asyncHandler(async (req, res) => {
   // get the data from request body
   // validate data - not empty , valid email
@@ -145,7 +150,7 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User Not Found");
   }
 
-  console.log("Logging in: ", { email, username , password });
+  console.log("Logging in: ", { email, username, password });
 
   const isPasswordValid = await user.isPasswordCorrect(password);
 
@@ -188,38 +193,272 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-const logOutUser = asyncHandler( async (req , res) => {
-
-  // refresh token set to null 
-  // if middleware successfuly verified then we can access req.user 
+// logout user
+// we just need one middleware for jwt
+const logOutUser = asyncHandler(async (req, res) => {
+  // refresh token set to null
+  // if middleware successfuly verified then we can access req.user
 
   const userId = req.user._id;
-  
+
   const user = await User.findById(userId);
 
-  if (!user){
+  if (!user) {
     throw new ApiError(404, "User not found");
   }
 
   user.refreshToken = "";
 
   await user.save({
-    validateBeforeSave: false, // we dont want to run the pre middleware for hashing the password again 
-  })
+    validateBeforeSave: false, // we dont want to run the pre middleware for hashing the password again
+  });
 
-  // clear the cookies 
+  // clear the cookies
 
   const options = {
     httpOnly: true,
     secure: true,
-  }
+  };
+
+  console.log("Logging out user: ", {
+    email: user.email,
+    username: user.username,
+    fullname: user.fullname,
+  });
 
   res
     .status(200)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
     .json(new ApiResponse(200, {}, "User Logged Out Successfully"));
+});
 
-} )
+// we just need one middleware for jwt
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshAccessToken;
 
-export { registerUser, logOutUser , loginUser };
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, "Refresh Token Not Found");
+  }
+
+  try {
+    // verify the refresh token
+    const decodeToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET,
+    );
+
+    if (!decodeToken) {
+      throw new ApiError(401, "Invalid Refresh Token or Refresh Token Expired");
+    }
+
+    const userId = decodeToken._id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      throw new ApiError(404, "User Not Found for Refresh Token");
+    }
+
+    if (incomingRefreshToken !== user.refreshToken) {
+      throw new ApiError(401, "Invalid Refresh Token or Refresh Token Expired");
+    }
+
+    // if all is well then generate new access token and refresh token
+    const { accessToken, refreshToken } =
+      await generateAccessTokenRefreshToken(userId);
+
+    res
+      .status(200)
+      .cookie("accessToken", accessToken, { httpOnly: true, secure: true })
+      .cookie("refreshToken", refreshToken, { httpOnly: true, secure: true })
+      .json(
+        new ApiResponse(200, {
+          user: user,
+          accessToken,
+          refreshToken,
+        }),
+        "User Logged In Successfully with New Access Token",
+      );
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Error in refreshing access token: " + error.message ||
+        "Refresh Token Error",
+    );
+  }
+});
+
+// we just need one middleware for jwt
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword, confirmPassword } = req.body;
+
+  if (
+    [oldPassword, newPassword, confirmPassword].some(
+      (val) => !val || val.trim() === "",
+    )
+  ) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  console.log("Changing Password: ", {
+    oldPassword,
+    newPassword,
+    confirmPassword,
+  });
+
+  const userId = req.user._id;
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(404, "User Not Found");
+  }
+
+  const isOldPasswordValid = await user.isPasswordCorrect(oldPassword);
+  if (!isOldPasswordValid) {
+    throw new ApiError(400, "Old Password is Not Matching");
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(400, "New Password and Confirm Password does not match");
+  }
+
+  user.password = newPassword;
+
+  // automatically will hash the password cause of pre middleware
+  await user.save({
+    validateBeforeSave: false,
+  });
+
+  console.log("New Password: ", newPassword);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        message: "Successfully changes Password",
+      },
+      "Password Changed Successfully",
+    ),
+  );
+});
+
+// we just need one middleware for jwt
+const getCurrentUserDetails = asyncHandler(async (req, res) => {
+  // we can access req.user
+  // simply if curretUser is valid using middleware then simply send the req.user
+  res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "User Found Successfully"));
+});
+
+// we just need one middleware for jwt
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { fullname, username } = req.body;
+
+  if (!fullname || !username) {
+    throw new ApiError(404, "All Fields are required");
+  }
+
+  const userId = req.user._id;
+
+  // because we dont want to run the pre middleware for hashing the password
+  const user = await User.findByIdAndUpdate(userId, {
+    $set: {
+      fullname: fullname,
+      username: username,
+    },
+  }).select("-password -refreshToken");
+
+  if (!user) {
+    throw new ApiError(404, "User Not Found");
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, { user: user }), "User Updated Successfully");
+});
+
+// for this we need 2 middlewares
+// first to check if user auth (jwt)
+// second to upload file in server public/temp folder
+const updateUserAvtar = asyncHandler(async (req, res) => {
+  const avtarLocalPath = req.file?.path;
+
+  if (!avtarLocalPath) {
+    throw new ApiError(400, "Avtar is required");
+  }
+
+  const avtar = await uploadOnCloudinary(avtarLocalPath);
+
+  if (!avtar.url) {
+    throw new ApiError(400, "Something went wrong while uploading avtar");
+  }
+
+  const userId = req.user._id;
+  const user = await User.findByIdAndUpdate(userId, {
+    $set: {
+      avtar: avtar.url,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(400, "User Not Found in DB for Avtar Update");
+  }
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user: user,
+      },
+      "Avtar Updated Successfully",
+    ),
+  );
+});
+
+// for this we need 2 middlewares
+// first to check if user auth (jwt)
+// second to upload file in server public/temp folder
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
+
+  if (!coverImageLocalPath) {
+    throw new ApiResponse(400, "Please provide cover image");
+  }
+
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+  if (!coverImage.url) {
+    throw new ApiResponse(
+      400,
+      "Something went wrong while uploading cover image",
+    );
+  }
+
+  const userId = req.user._id;
+  const user = await User.findByIdAndUpdate(userId, {
+    $set: {
+      coverImage: coverImage.url,
+    },
+  })
+  .select("-password -refreshToken");
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(200, { user: user }, "Cover Image Updated Successfully"),
+    );
+});
+
+export {
+  registerUser,
+  logOutUser,
+  loginUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUserDetails,
+  updateAccountDetails,
+  updateUserAvtar,
+  updateUserCoverImage
+};
