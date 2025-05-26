@@ -17,11 +17,13 @@ app.use(cookieParser());                        // we can set or get cookies can
 
 // routes 
 import { userRouter } from "./routes/user.routes.js";
+import { subscriptionRouter } from "./routes/subscription.routes.js";
 
 // router declaration middlewares 
 // it means any url start with /users will be handlerd by userRouter
 // inside userRouter we have define all the user related routes like /register, /login etc 
 // which is /users/register, /users/login etc
 app.use("/api/v1/users", userRouter); // /users is the base url for all user routes
+app.use("/api/v1/subscriptions", subscriptionRouter); // /subscriptions is the base url for all subscription routes
 
 export default app;
