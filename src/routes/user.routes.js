@@ -9,6 +9,8 @@ import {
   updateAccountDetails,
   updateUserAvtar,
   updateUserCoverImage,
+  getAllUsers,
+  getChannelProfile
 } from "../controllers/user.controllers.js";
 import { upload } from "../middlerwares/multer.middleware.js";
 import { verifyJWT } from "../middlerwares/auth.middleware.js";
@@ -53,7 +55,9 @@ userRouter.route("/logout").post(
 );
 userRouter.route("/change-password").post(verifyJWT, changeCurrentPassword);
 userRouter.route("/").get(verifyJWT, getCurrentUserDetails);
-userRouter.route("/update-account").post(verifyJWT, updateAccountDetails);
+userRouter
+  .route("/update-account-details")
+  .post(verifyJWT, updateAccountDetails);
 
 // if user verify using jwt then we can upload avtar and then updateUserAvtar Will Work
 userRouter.route("/update-avtar").post(
@@ -73,10 +77,17 @@ userRouter.route("/update-avtar").post(
 //    - Uploads it to Cloudinary.
 //    - Updates the user's document with Cloudinary URL in DB.
 //    - Returns updated user info (excluding password & refreshToken).
-userRouter.route("/update-coverImage").post(
+userRouter.route("/update-cover-image").post(
   verifyJWT,
   upload.single("coverImage"), // middleware for uploading files,
   updateUserCoverImage,
 );
+
+userRouter.route("/get-all-users").get(verifyJWT, getAllUsers);
+
+userRouter.route("/user-profile/:username").get(
+  verifyJWT,
+  getChannelProfile
+)
 
 export { userRouter };

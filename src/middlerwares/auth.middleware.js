@@ -3,40 +3,7 @@ import { User } from "../models/user.models.js";
 import jwt, { decode } from "jsonwebtoken";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-const createNewAccessToken = async (refreshToken) => {
-  // verify the refresh token
-  // if error then return error or return false
-  // if refresh token is valid then create new access token
-  // and return it
 
-  // verify the refresh token
-  const decodedToken = jwt.verify(
-    refreshToken,
-    process.env.REFRESH_TOKEN_SECRET,
-  );
-
-  // if error then return error or return false
-  if (!decodedToken) {
-    throw new ApiError(401, "Invalid Refresh Token");
-  }
-
-  const userId = decodedToken._id;
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw new ApiError(404, "User Not Found");
-  }
-
-  // jwt methods are synchronous so dont need to write async / await here
-  const newAccessToken = user.generateAccessToken();
-
-  if (!newAccessToken) {
-    throw new ApiError(500, "Failed to generate new access token");
-  }
-
-  // return the new access token
-  return newAccessToken;
-};
 
 export const verifyJWT = asyncHandler(async (req, res, next) => {
   // this is access token
@@ -72,6 +39,8 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     user.save({
       validateBeforeSave: false,
     });
+
+    console.log("New Access Token and Refresh Token Generated: ", { newAccessToken , newRefreshToken })
 
     // added extra field to the request object
     // and this will be available in the next middlewares or controllers
