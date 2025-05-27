@@ -1,8 +1,8 @@
-import { asyncHandler } from "../utils/asyncHandler";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/apiError.js";
 import { Subscription } from "../models/subscription.models.js";
 import mongoose from "mongoose";
-import { ApiResponse } from "../utils/apiResponse";
+import { ApiResponse } from "../utils/apiResponse.js";
 
 const subscribeUser = asyncHandler(async (req, res) => {
   const userId = req.user._id;

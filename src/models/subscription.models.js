@@ -1,5 +1,5 @@
-import { Schema , Model } from "mongoose";
-import { User } from "./user.models";
+import { Schema , model } from "mongoose";
+import { User } from "./user.models.js";
 
 const subscriptionScema = new Schema({
     subscriber : {
@@ -16,4 +16,4 @@ const subscriptionScema = new Schema({
 }
 ) 
 
-export const Subscription = new Model("Subscription" , subscriptionScema); 
+export const Subscription = new model("Subscription" , subscriptionScema); 

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { verifyJWT } from "../middlerwares/auth.middleware";
-import { subscribeUser, unSubscribeUser } from "../controllers/subscription.controllers";
+import { verifyJWT } from "../middlerwares/auth.middleware.js";
+import { subscribeUser, unSubscribeUser } from "../controllers/subcription.controllers.js";
 
 const subscriptionRouter = Router();
 

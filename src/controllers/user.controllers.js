@@ -484,41 +484,41 @@ const getChannelProfile = asyncHandler(async (req, res) => {
   const channel = await User.aggregate([
     {
       $match: {
-        username: username?.toLowerCase()
-      }
+        username: username?.toLowerCase(),
+      },
     },
     {
       $lookup: {
         from: "subscriptions", // collection name should be lowercase
         localField: "_id",
         foreignField: "channel",
-        as: "subscribers"
-      }
+        as: "subscribers",
+      },
     },
     {
       $lookup: {
         from: "subscriptions",
         localField: "_id",
         foreignField: "subscriber",
-        as: "subscribedTo"
-      }
+        as: "subscribedTo",
+      },
     },
     {
       $addFields: {
         subscribersCount: {
-          $size: "$subscribers"
+          $size: "$subscribers",
         },
         channelsSubscribedToCount: {
-          $size: "$subscribedTo"
+          $size: "$subscribedTo",
         },
         isSubscribed: {
           $cond: {
             if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
-            else: false
-          }
-        }
-      }
+            else: false,
+          },
+        },
+      },
     },
     {
       $project: {
@@ -529,27 +529,30 @@ const getChannelProfile = asyncHandler(async (req, res) => {
         isSubscribed: 1,
         avatar: 1,
         email: 1,
-        coverImage: 1
-      }
-    }
+        coverImage: 1,
+      },
+    },
   ]);
 
   if (!channel?.length) {
     throw new ApiError(404, "Channel not found");
   }
 
-  return res.status(200).json(
-    new ApiResponse(200, channel[0], "Channel fetched successfully")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channel[0], "Channel fetched successfully"));
 });
 
 const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
+    // stage 1 -> match the user by id and pass to the next stage
     {
       $match: {
         _id: new mongoose.Types.ObjectId(req.user?._id), // Fix: Schema.Types to Types
       },
     },
+
+    // stage 2 -> lookup the watchHistory from videos collection
     {
       $lookup: {
         from: "videos", // collection name should be lowercase
@@ -557,6 +560,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         foreignField: "_id",
         as: "watchHistory",
         pipeline: [
+          // stage 3 -> lookup the owner from users collection (inside videos)
           {
             $lookup: {
               from: "users", // collection name should be lowercase
@@ -574,6 +578,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               ],
             },
           },
+
+          // stage 4 -> add the owner to the watchHistory
           {
             $addFields: {
               owner: {
@@ -590,14 +596,49 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User history not found");
   }
 
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      { watchHistory: user[0]?.watchHistory || [] },
-      "Watch history fetched successfully",
-    ),
-  );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { watchHistory: user[0]?.watchHistory || [] },
+        "Watch history fetched successfully",
+      ),
+    );
 });
+
+// Example response for getWatchHistory
+/*
+[
+  {
+    _id: "user123",
+    fullname: "Ndk",
+    username: "ndk007",
+    avatar: "dp.png",
+    watchHistory: [
+      {
+        _id: "video111",
+        title: "Mongoose Aggregation Explained",
+        owner: {
+          fullname: "Ankit Dev",
+          username: "ankitdev",
+          avatar: "ankit.png"
+        }
+      },
+      {
+        _id: "video222",
+        title: "Deep Dive into Lookup",
+        owner: {
+          fullname: "Pooja Shah",
+          username: "poojashah",
+          avatar: "pooja.png"
+        }
+      }
+    ]
+  }
+]
+
+*/
 
 export {
   registerUser,
@@ -611,5 +652,5 @@ export {
   updateUserCoverImage,
   getAllUsers,
   getChannelProfile,
-  getWatchHistory
+  getWatchHistory,
 };

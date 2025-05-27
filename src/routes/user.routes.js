@@ -15,6 +15,8 @@ import {
 import { upload } from "../middlerwares/multer.middleware.js";
 import { verifyJWT } from "../middlerwares/auth.middleware.js";
 import { verify } from "crypto";
+import app from "../app.js";
+import { ApiError } from "../utils/apiError.js";
 
 const userRouter = Router();
 
