@@ -21,6 +21,7 @@ import { userRouter } from "./routes/user.routes.js";
 import { subscriptionRouter } from "./routes/subscription.routes.js";
 import { tweetRouter } from "./routes/tweet.routes.js";
 import { commentRouter } from "./routes/comments.routes.js";
+import { channeRouter } from "./routes/channel.routes.js";
 
 // router declaration middlewares 
 // it means any url start with /users will be handlerd by userRouter
@@ -28,8 +29,9 @@ import { commentRouter } from "./routes/comments.routes.js";
 // which is /users/register, /users/login etc
 app.use("/api/v1/users", userRouter); // /users is the base url for all user routes
 app.use("/api/v1/subscriptions", subscriptionRouter); // /subscriptions is the base url for all subscription routes
-app.use("/api/v1/tweets" , tweetRouter)
-app.use("/api/v1/comments",commentRouter)
+app.use("/api/v1/tweets" , tweetRouter);
+app.use("/api/v1/comments",commentRouter);
+app.use("/api/v1/channels/",channeRouter);
 
 app.use( ( err , req , res , next ) => {
   throw new ApiError(

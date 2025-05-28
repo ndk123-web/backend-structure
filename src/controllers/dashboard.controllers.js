@@ -1,10 +1,11 @@
-import { asyncHandler } from "../utils/asyncHandler"; // Importing asyncHandler to handle asynchronous routes
+import { asyncHandler } from "../utils/asyncHandler.js"; // Importing asyncHandler to handle asynchronous routes
 import mongoose from "mongoose"; // Importing mongoose for MongoDB operations
-import { User } from "../models/user.models"; // Importing the User model
-import { Like } from "../models/like.models"; // Importing the Like model
-import { Video } from "../models/video.models"; // Importing the Video model
-import { Subscription } from "../models/subscription.models"; // Importing the Subscription model
-import { ApiError } from "../utils/apiError"; // Importing ApiError for error handling
+import { User } from "../models/user.models.js"; // Importing the User model
+import { Like } from "../models/like.models.js"; // Importing the Like model
+import { Video } from "../models/video.models.js"; // Importing the Video model
+import { Subscription } from "../models/subscription.models.js"; // Importing the Subscription model
+import { ApiError } from "../utils/apiError.js"; // Importing ApiError for error handling
+import { ApiResponse } from "../utils/apiResponse.js";
 
 // getChannelStats is an asynchronous function wrapped in asyncHandler
 const getChannelStats = asyncHandler(async (req, res) => {
@@ -93,4 +94,56 @@ const getChannelStats = asyncHandler(async (req, res) => {
   );
 });
 
-export { getChannelStats }; // Export the getChannelStats function
+const getChannelVideos = asyncHandler(async (req, res) => {
+  // TODO: Get all the videos uploaded by the channel
+
+  // if we want channel Videos then we want
+  // 1. all channel videos , 2. each video likes
+
+  const { channelId } = req.params; // Extract channelId from request parameters
+
+  if (!channelId) {
+    throw new ApiError(400, "Channel ID is required");
+  }
+
+  if (!mongoose.isValidObjectId(channelId)) {
+    throw new ApiError(400, "Invalid channel ID");
+  }
+
+  const videos = await Video.aggregate([
+    // Stage 1: Match videos of channel
+    {
+      $match: {
+        owner: mongoose.Types.ObjectId(channelId),
+      },
+    },
+
+    // Stage 2: Lookup likes for each video
+    {
+      $lookup: {
+        from: "likes", // likes collection
+        localField: "_id", // video _id
+        foreignField: "video", // likes.video field
+        as: "likes",
+      },
+    },
+
+    // Stage 3: Add totalLikes field as count of likes array
+    {
+      $addFields: {
+        totalLikes: { $size: "$likes" },
+      },
+    },
+
+    // Stage 4: Project fields to return
+    {
+      $project: {
+        title: 1,
+        views: 1,
+        totalLikes: 1,
+      },
+    },
+  ]);
+});
+
+export { getChannelStats , getChannelVideos }; // Export the getChannelStats function
