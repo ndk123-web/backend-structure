@@ -9,17 +9,14 @@ const likeSchema = new mongoose.Schema({
   likeBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
   },
   tweet: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Tweet",
-    required: true,
   },
   comment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Comment",
-    required: true,
   },
 });
 
